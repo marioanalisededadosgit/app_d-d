@@ -1,0 +1,16 @@
+# Arquivos de ambiente virtual
+venv/
+env/
+
+# Arquivos compilados do Python
+__pycache__/
+*.pyc
+
+# Arquivos do PyInstaller
+build/
+dist/
+*.spec
+
+# Banco de dados local (Para não subir pro Github os monstros do seu jogo privado)
+dnd_data.json
+dnd_data.db
