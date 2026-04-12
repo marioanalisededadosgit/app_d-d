@@ -1008,8 +1008,8 @@ class App(ctk.CTk):
             is_player = p.char_type == "Jogador"
             row_bg    = "#181818" # Darker background
             
-            row = ctk.CTkFrame(self.encounter_list, fg_color=row_bg, corner_radius=8, border_width=1, border_color="#333")
-            row.pack(fill="x", pady=4, padx=4)
+            row = ctk.CTkFrame(self.encounter_list, fg_color=row_bg, corner_radius=6, border_width=1, border_color="#333")
+            row.pack(fill="x", pady=2, padx=2)
 
             # Badge de posição amarela (fita)
             badge_bg  = "#D4AF37" if show_rolls else "#555" # Gold yellow
@@ -1017,29 +1017,34 @@ class App(ctk.CTk):
                 badge_bg = "#4A90E2" # Blue for player
             badge_tc  = "black" if show_rolls else "white"
             
-            badge = ctk.CTkFrame(row, fg_color=badge_bg, width=45, corner_radius=6)
+            badge = ctk.CTkFrame(row, fg_color=badge_bg, width=35, corner_radius=6)
             badge.pack(side="left", fill="y", padx=2, pady=2)
             badge.pack_propagate(False)
             
             ctk.CTkLabel(
                 badge, text=str(idx + 1),
-                font=ctk.CTkFont(size=16, weight="bold"),
+                font=ctk.CTkFont(size=14, weight="bold"),
                 text_color=badge_tc,
             ).pack(expand=True)
 
             # Informações
             inf = ctk.CTkFrame(row, fg_color="transparent")
-            inf.pack(side="left", fill="x", expand=True, padx=12, pady=10)
+            inf.pack(side="left", fill="x", expand=True, padx=8, pady=4)
 
-            ctk.CTkLabel(
-                inf, text=p.name.upper(),
-                font=ctk.CTkFont(size=14, weight="bold"), anchor="w",
+            name_frame = ctk.CTkFrame(inf, fg_color="transparent")
+            name_frame.pack(fill="x")
+            
+            skull_prefix = "💀 " if getattr(p, 'current_hp', 1) <= 0 else ""
+            lbl_name = ctk.CTkLabel(
+                name_frame, text=f"{skull_prefix}{p.name.upper()}",
+                font=ctk.CTkFont(size=13, weight="bold"), anchor="w",
                 text_color="white"
-            ).pack(anchor="w")
+            )
+            lbl_name.pack(side="left")
 
             if show_rolls:
                 detail = (
-                    f"Iniciativa: {p.initiative_total}  "
+                    f"Iniciativa: {p.initiative_total} "
                     f"(@ {p.roll_result} + Dex {mod_str(p.dex_modifier)})"
                 )
                 ctk.CTkLabel(
@@ -1049,9 +1054,49 @@ class App(ctk.CTk):
             else:
                 ctk.CTkLabel(
                     inf,
-                    text=f"{p.char_type}  •  Aguardando rolagem...",
+                    text=f"{p.char_type} • Aguardando...",
                     font=ctk.CTkFont(size=11), text_color="gray", anchor="w",
                 ).pack(anchor="w")
+
+            # HP Tracker (Direita)
+            hp_frame = ctk.CTkFrame(row, fg_color="transparent")
+            hp_frame.pack(side="right", padx=6, pady=4)
+            
+            lbl_hp_val = ctk.CTkLabel(
+                hp_frame, text=str(getattr(p, 'current_hp', 0)),
+                font=ctk.CTkFont(size=12, weight="bold"),
+                width=28, text_color="#E57373" if getattr(p, 'current_hp', 1) <= 0 else "white"
+            )
+
+            def make_adj_fn(part, delta, l_name, l_hp):
+                def _adj():
+                    part.current_hp += delta
+                    l_hp.configure(text=str(part.current_hp))
+                    if part.current_hp <= 0:
+                        l_name.configure(text=f"💀 {part.name.upper()}")
+                        l_hp.configure(text_color="#E57373")
+                    else:
+                        l_name.configure(text=f"{part.name.upper()}")
+                        l_hp.configure(text_color="white")
+                return _adj
+
+            btn_minus = ctk.CTkButton(
+                hp_frame, text="-", width=22, height=22,
+                font=ctk.CTkFont(size=12, weight="bold"),
+                fg_color="#8B1A1A", hover_color="#6B1010",
+                command=make_adj_fn(p, -1, lbl_name, lbl_hp_val)
+            )
+            btn_minus.pack(side="left", padx=2)
+
+            lbl_hp_val.pack(side="left", padx=2)
+
+            btn_plus = ctk.CTkButton(
+                hp_frame, text="+", width=22, height=22,
+                font=ctk.CTkFont(size=12, weight="bold"),
+                fg_color="#1A5C2A", hover_color="#10401A",
+                command=make_adj_fn(p, 1, lbl_name, lbl_hp_val)
+            )
+            btn_plus.pack(side="left", padx=2)
 
             # Clique na linha → exibe ficha no card lateral
             def _make_handler(participant):
@@ -1061,9 +1106,14 @@ class App(ctk.CTk):
                 return handler
 
             cb = _make_handler(p)
-            row.bind("<Button-1>", cb)
-            for child in row.winfo_children():
-                child.bind("<Button-1>", cb)
+            
+            def bind_recursively(widget, handler):
+                if not isinstance(widget, ctk.CTkButton):
+                    widget.bind("<Button-1>", handler)
+                    for child in widget.winfo_children():
+                        bind_recursively(child, handler)
+            
+            bind_recursively(row, cb)
 
 
 if __name__ == "__main__":

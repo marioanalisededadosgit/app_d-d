@@ -15,6 +15,8 @@ class Participant:
         self.char_id      = char_data.get('id')
         self.char_type    = char_data.get('type', 'Monstro')
         self.dex_modifier = char_data.get('dex_modifier', 0)
+        self.max_hp       = char_data.get('hit_points', 1)
+        self.current_hp   = self.max_hp
         self.roll_result  = 0
         self.initiative_total = 0
 
