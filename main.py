@@ -6,6 +6,13 @@ import tkinter.filedialog as filedialog
 
 import customtkinter as ctk
 
+try:
+    from PIL import Image as PilImage
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+    PilImage = None
+
 from database import (
     create_table, add_character, update_character,
     delete_character, get_all_characters, get_characters_by_type,
@@ -138,10 +145,9 @@ class CharacterCard(ctk.CTkScrollableFrame):
 
         # ── Imagem ──────────────────────────────────────────────────────────
         img_path = c.get("image_path", "")
-        if img_path and os.path.exists(img_path):
+        if img_path and os.path.exists(img_path) and PIL_AVAILABLE:
             try:
-                from PIL import Image
-                pil = Image.open(img_path)
+                pil = PilImage.open(img_path)
                 pil.thumbnail((200, 200))
                 ctk_img = ctk.CTkImage(
                     light_image=pil, dark_image=pil, size=pil.size
@@ -149,8 +155,8 @@ class CharacterCard(ctk.CTkScrollableFrame):
                 lbl = ctk.CTkLabel(self, image=ctk_img, text="")
                 lbl.image = ctk_img        # keep reference
                 lbl.pack(pady=6)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[CharacterCard] Erro ao carregar imagem: {e}")
 
         # ── CA / HP / Velocidade ─────────────────────────────────────────────
         stats_row = ctk.CTkFrame(self, fg_color="transparent")
@@ -491,7 +497,7 @@ class EditModal(ctk.CTkToplevel):
         except (ValueError, KeyError):
             fields["dex_modifier"] = attr_dict.get("dex_mod", 0)
 
-        # Habilidades Especiais (JSON)
+        # Habilidades Especiais (JSON ou texto livre)
         raw_traits = self.traits_tb.get("0.0", "end").strip()
         if not raw_traits or raw_traits == "[]":
             fields["special_traits"] = []
@@ -501,15 +507,16 @@ class EditModal(ctk.CTkToplevel):
                 if not isinstance(parsed, list):
                     raise ValueError("Deve ser uma lista")
                 fields["special_traits"] = parsed
-            except (json.JSONDecodeError, ValueError) as e:
-                messagebox.showerror(
-                    "JSON Inválido — Habilidades Especiais",
-                    f"Corrija o JSON antes de salvar:\n{e}",
-                    parent=self,
-                )
-                return
+            except (json.JSONDecodeError, ValueError):
+                # Aceita texto livre: cada parágrafo vira uma entrada
+                entries = [p.strip() for p in raw_traits.split("\n\n") if p.strip()]
+                if not entries:
+                    entries = [raw_traits]
+                fields["special_traits"] = [
+                    {"name": "Habilidade", "desc": e} for e in entries
+                ]
 
-        # Ações (JSON)
+        # Ações (JSON ou texto livre)
         raw_actions = self.actions_tb.get("0.0", "end").strip()
         if not raw_actions or raw_actions == "[]":
             fields["actions"] = []
@@ -519,13 +526,14 @@ class EditModal(ctk.CTkToplevel):
                 if not isinstance(parsed, list):
                     raise ValueError("Deve ser uma lista")
                 fields["actions"] = parsed
-            except (json.JSONDecodeError, ValueError) as e:
-                messagebox.showerror(
-                    "JSON Inválido — Ações",
-                    f"Corrija o JSON antes de salvar:\n{e}",
-                    parent=self,
-                )
-                return
+            except (json.JSONDecodeError, ValueError):
+                # Aceita texto livre: cada parágrafo vira uma entrada
+                entries = [p.strip() for p in raw_actions.split("\n\n") if p.strip()]
+                if not entries:
+                    entries = [raw_actions]
+                fields["actions"] = [
+                    {"name": "Ação", "desc": e} for e in entries
+                ]
 
         update_character(self.char_data["id"], fields)
         # Devolve o char_data atualizado para o callback
