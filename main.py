@@ -120,14 +120,14 @@ class CharacterCard(ctk.CTkScrollableFrame):
         attrs = c.get("attributes", {})
 
         # ── Cabeçalho ───────────────────────────────────────────────────────
-        header = ctk.CTkFrame(self, fg_color=RED_MID, corner_radius=8)
+        header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=6, pady=(6, 3))
 
         ctk.CTkLabel(
-            header, text=c.get("name", "?"),
-            font=ctk.CTkFont(size=20, weight="bold"),
+            header, text=str(c.get("name", "?")).upper(),
+            font=ctk.CTkFont(size=24, weight="bold"),
             text_color="white",
-        ).pack(padx=12, pady=(10, 2))
+        ).pack(anchor="w", padx=4)
 
         sub_parts = []
         sr = f"{c.get('size', '')} {c.get('race', '')}".strip()
@@ -138,137 +138,117 @@ class CharacterCard(ctk.CTkScrollableFrame):
         if sub_parts:
             ctk.CTkLabel(
                 header,
-                text="  •  ".join(sub_parts),
-                font=ctk.CTkFont(size=10),
-                text_color=GOLD_LIGHT,
-            ).pack(padx=12, pady=(0, 8))
+                text=" - ".join(sub_parts),
+                font=ctk.CTkFont(size=12),
+                text_color="#AAAAAA",
+            ).pack(anchor="w", padx=4, pady=(0, 8))
 
-        # ── Imagem ──────────────────────────────────────────────────────────
+        # ── Corpo (Imagem + Status) ─────────────────────────────────────────
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.pack(fill="x", padx=6, pady=4)
+        body.columnconfigure(0, weight=1)
+        body.columnconfigure(1, weight=1)
+
+        # Imagem (coluna esquerda)
+        img_frame = ctk.CTkFrame(body, fg_color="white", corner_radius=8)
+        img_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
+        
         img_path = c.get("image_path", "")
         if img_path and os.path.exists(img_path) and PIL_AVAILABLE:
             try:
                 pil = PilImage.open(img_path)
-                pil.thumbnail((200, 200))
+                pil.thumbnail((220, 220))
                 ctk_img = ctk.CTkImage(
                     light_image=pil, dark_image=pil, size=pil.size
                 )
-                lbl = ctk.CTkLabel(self, image=ctk_img, text="")
+                lbl = ctk.CTkLabel(img_frame, image=ctk_img, text="")
                 lbl.image = ctk_img        # keep reference
-                lbl.pack(pady=6)
+                lbl.pack(pady=6, padx=6, expand=True)
             except Exception as e:
                 print(f"[CharacterCard] Erro ao carregar imagem: {e}")
+                ctk.CTkLabel(img_frame, text="Sem Imagem", text_color="gray").pack(expand=True)
+        else:
+            ctk.CTkLabel(img_frame, text="Sem Imagem", text_color="gray").pack(expand=True)
 
-        # ── CA / HP / Velocidade ─────────────────────────────────────────────
-        stats_row = ctk.CTkFrame(self, fg_color="transparent")
-        stats_row.pack(fill="x", padx=6, pady=4)
+        # Status Stack (coluna direita)
+        stats_col = ctk.CTkFrame(body, fg_color="transparent")
+        stats_col.grid(row=0, column=1, sticky="nsew", padx=(4, 0))
 
         stat_defs = [
-            ("Armadura\nClasse", str(c.get("armor_class", 0)), c.get("armor_desc", "")),
-            ("Pontos\nde Vida",  str(c.get("hit_points",  0)), c.get("hit_dice",   "")),
-            ("Veloci-\ndade",    c.get("speed", "—"),          ""),
+            ("🛡️", "Armadura Classe", str(c.get("armor_class", 0)), c.get("armor_desc", "")),
+            ("❤️", "Pontos Vida",  str(c.get("hit_points",  0)), c.get("hit_dice",   "")),
+            ("👢", "Velocidade",    c.get("speed", "—"),          ""),
         ]
-        for col_i, (lbl, val, sub) in enumerate(stat_defs):
-            stats_row.columnconfigure(col_i, weight=1)
-            box = ctk.CTkFrame(stats_row, fg_color=CARD_BG, corner_radius=6)
-            box.grid(row=0, column=col_i, padx=2, sticky="ew")
-            ctk.CTkLabel(box, text=lbl, font=ctk.CTkFont(size=9),
-                         text_color=GOLD, wraplength=70).pack(pady=(5, 0))
-            ctk.CTkLabel(box, text=val,
-                         font=ctk.CTkFont(size=15, weight="bold")).pack()
-            ctk.CTkLabel(box, text=sub, font=ctk.CTkFont(size=8),
-                         text_color="#AAAAAA", wraplength=70).pack(pady=(0, 5))
-
-        self._sep()
+        
+        for i, (icon, lbl, val, sub) in enumerate(stat_defs):
+            box = ctk.CTkFrame(stats_col, fg_color="#181818", corner_radius=6)
+            box.pack(fill="both", expand=True, pady=(0 if i==0 else 6, 0))
+            
+            # Icon
+            ctk.CTkLabel(box, text=icon, font=ctk.CTkFont(size=28)).pack(side="left", padx=12)
+            
+            # Textos
+            text_frame = ctk.CTkFrame(box, fg_color="transparent")
+            text_frame.pack(side="left", fill="both", expand=True, pady=8)
+            
+            ctk.CTkLabel(text_frame, text=lbl, font=ctk.CTkFont(size=11), text_color="#AAAAAA").pack(anchor="w")
+            ctk.CTkLabel(text_frame, text=val, font=ctk.CTkFont(size=20, weight="bold")).pack(anchor="w", pady=(0, 2))
+            if sub:
+                ctk.CTkLabel(text_frame, text=sub, font=ctk.CTkFont(size=10), text_color="gray").pack(anchor="w")
 
         # ── Atributos ────────────────────────────────────────────────────────
         ag = ctk.CTkFrame(self, fg_color="transparent")
-        ag.pack(fill="x", padx=6, pady=4)
+        ag.pack(fill="x", padx=6, pady=10)
 
         for col_i, (lbl, k, mk) in enumerate(self._ATTR_ORDER):
             ag.columnconfigure(col_i, weight=1)
             val = attrs.get(k, 10)
             mod = attrs.get(mk, calc_mod(val))
-            box = ctk.CTkFrame(ag, fg_color=CARD_BG, corner_radius=6)
-            box.grid(row=0, column=col_i, padx=1, sticky="ew")
+            box = ctk.CTkFrame(ag, fg_color="#181818", corner_radius=6, border_color="#333", border_width=1)
+            box.grid(row=0, column=col_i, padx=2, sticky="ew")
             ctk.CTkLabel(box, text=lbl,
-                         font=ctk.CTkFont(size=9, weight="bold"),
-                         text_color=GOLD).pack(pady=(4, 0))
-            ctk.CTkLabel(box, text=str(val),
-                         font=ctk.CTkFont(size=13, weight="bold")).pack()
-            ctk.CTkLabel(box, text=mod_str(mod),
                          font=ctk.CTkFont(size=10),
-                         text_color="#7DADE2").pack(pady=(0, 4))
+                         text_color="#AAAAAA").pack(pady=(4, 0))
+            ctk.CTkLabel(box, text=str(val),
+                         font=ctk.CTkFont(size=16, weight="bold")).pack()
+            mod_bg = ctk.CTkFrame(box, fg_color="#222", corner_radius=4)
+            mod_bg.pack(fill="x", padx=4, pady=(0,4))
+            ctk.CTkLabel(mod_bg, text=mod_str(mod),
+                         font=ctk.CTkFont(size=11),
+                         text_color="white").pack(pady=2)
 
-        self._sep()
-
-        # ── Sentidos / Idiomas / Desafio ─────────────────────────────────────
-        info_f = ctk.CTkFrame(self, fg_color="transparent")
-        info_f.pack(fill="x", padx=10, pady=2)
-
-        for lbl, key in [("Sentidos", "senses"), ("Idiomas", "languages")]:
-            val = c.get(key, "")
-            if val:
-                ctk.CTkLabel(
-                    info_f,
-                    text=f"• {lbl}: {val}",
-                    font=ctk.CTkFont(size=10),
-                    text_color="#CCCCCC",
-                    wraplength=240,
-                    justify="left", anchor="w",
-                ).pack(anchor="w", pady=1)
-
-        ctk.CTkLabel(
-            info_f,
-            text=f"• Desafio: {c.get('challenge', '0')} ({c.get('xp', 0)} XP)",
-            font=ctk.CTkFont(size=10),
-            text_color="#CCCCCC", anchor="w",
-        ).pack(anchor="w", pady=1)
-
-        # ── Habilidades Especiais ─────────────────────────────────────────────
+        # ── Sentidos / Extra ─────────────────────────────────────
+        senses = c.get("senses", "")
+        if senses:
+            ctk.CTkLabel(
+                self, text=f"* Sentidos {senses}",
+                font=ctk.CTkFont(size=11, slant="italic"),
+                text_color="#888", anchor="w"
+            ).pack(fill="x", padx=10, pady=(0, 10))
+            
         traits = c.get("special_traits", [])
-        if traits:
+        actions = c.get("actions", [])
+        if traits or actions:
             self._sep()
+        
+        if traits:
             for t in traits:
                 tf = ctk.CTkFrame(self, fg_color="transparent")
-                tf.pack(fill="x", padx=10, pady=(2, 0))
-                ctk.CTkLabel(
-                    tf, text=f"⬥ {t.get('name', '')}",
-                    font=ctk.CTkFont(size=11, weight="bold"),
-                    text_color=GOLD_LIGHT, anchor="w",
-                ).pack(anchor="w")
-                ctk.CTkLabel(
-                    tf, text=t.get("desc", ""),
-                    font=ctk.CTkFont(size=10),
-                    wraplength=240, justify="left", anchor="w",
-                ).pack(anchor="w")
-
-        # ── Ações ─────────────────────────────────────────────────────────────
-        actions = c.get("actions", [])
+                tf.pack(fill="x", padx=10, pady=2)
+                ctk.CTkLabel(tf, text=f"• {t.get('name', '')}", font=ctk.CTkFont(size=11, weight="bold"), text_color=GOLD_LIGHT, anchor="w").pack(anchor="w")
+                ctk.CTkLabel(tf, text=t.get("desc", ""), font=ctk.CTkFont(size=10), wraplength=260, justify="left", anchor="w", text_color="#CCC").pack(anchor="w")
+                
         if actions:
-            hdr = ctk.CTkFrame(self, fg_color=RED_DARK, corner_radius=6)
-            hdr.pack(fill="x", padx=6, pady=(8, 2))
-            ctk.CTkLabel(
-                hdr, text="AÇÕES",
-                font=ctk.CTkFont(size=12, weight="bold"),
-                text_color="white",
-            ).pack(pady=4)
-
+            if traits: self._sep()
+            ctk.CTkLabel(self, text="AÇÕES", font=ctk.CTkFont(size=11, weight="bold"), text_color=RED_MID, anchor="w").pack(fill="x", padx=10, pady=(4, 0))
             for a in actions:
                 af = ctk.CTkFrame(self, fg_color="transparent")
-                af.pack(fill="x", padx=10, pady=(2, 0))
-                ctk.CTkLabel(
-                    af, text=f"⬥ {a.get('name', '')}",
-                    font=ctk.CTkFont(size=11, weight="bold"),
-                    text_color=GOLD_LIGHT, anchor="w",
-                ).pack(anchor="w")
-                ctk.CTkLabel(
-                    af, text=a.get("desc", ""),
-                    font=ctk.CTkFont(size=10),
-                    wraplength=240, justify="left", anchor="w",
-                ).pack(anchor="w")
+                af.pack(fill="x", padx=10, pady=2)
+                ctk.CTkLabel(af, text=f"⚔️ {a.get('name', '')}", font=ctk.CTkFont(size=11, weight="bold"), text_color=GOLD_LIGHT, anchor="w").pack(anchor="w")
+                ctk.CTkLabel(af, text=a.get("desc", ""), font=ctk.CTkFont(size=10), wraplength=260, justify="left", anchor="w", text_color="#CCC").pack(anchor="w")
 
     def _sep(self):
-        ctk.CTkFrame(self, height=1, fg_color="#4A2020").pack(
+        ctk.CTkFrame(self, height=1, fg_color="#222").pack(
             fill="x", padx=10, pady=4
         )
 
@@ -1026,46 +1006,51 @@ class App(ctk.CTk):
 
         for idx, p in enumerate(self.encounter.participants):
             is_player = p.char_type == "Jogador"
-            row_bg    = "#0D2137" if is_player else "#220D0D"
+            row_bg    = "#181818" # Darker background
+            
+            row = ctk.CTkFrame(self.encounter_list, fg_color=row_bg, corner_radius=8, border_width=1, border_color="#333")
+            row.pack(fill="x", pady=4, padx=4)
 
-            row = ctk.CTkFrame(self.encounter_list, fg_color=row_bg, corner_radius=8)
-            row.pack(fill="x", pady=3, padx=3)
-
-            # Badge de posição
-            badge_bg  = GOLD    if show_rolls else "#555"
+            # Badge de posição amarela (fita)
+            badge_bg  = "#D4AF37" if show_rolls else "#555" # Gold yellow
+            if is_player and show_rolls:
+                badge_bg = "#4A90E2" # Blue for player
             badge_tc  = "black" if show_rolls else "white"
-            badge = ctk.CTkFrame(row, fg_color=badge_bg, width=34, corner_radius=6)
-            badge.pack(side="left", fill="y", padx=(6, 8), pady=6)
+            
+            badge = ctk.CTkFrame(row, fg_color=badge_bg, width=45, corner_radius=6)
+            badge.pack(side="left", fill="y", padx=2, pady=2)
             badge.pack_propagate(False)
+            
             ctk.CTkLabel(
                 badge, text=str(idx + 1),
-                font=ctk.CTkFont(size=14, weight="bold"),
+                font=ctk.CTkFont(size=16, weight="bold"),
                 text_color=badge_tc,
             ).pack(expand=True)
 
             # Informações
             inf = ctk.CTkFrame(row, fg_color="transparent")
-            inf.pack(side="left", fill="x", expand=True, pady=6)
+            inf.pack(side="left", fill="x", expand=True, padx=12, pady=10)
 
             ctk.CTkLabel(
-                inf, text=p.name,
-                font=ctk.CTkFont(size=13, weight="bold"), anchor="w",
+                inf, text=p.name.upper(),
+                font=ctk.CTkFont(size=14, weight="bold"), anchor="w",
+                text_color="white"
             ).pack(anchor="w")
 
             if show_rolls:
                 detail = (
                     f"Iniciativa: {p.initiative_total}  "
-                    f"(🎲 {p.roll_result} + Dex {mod_str(p.dex_modifier)})"
+                    f"(@ {p.roll_result} + Dex {mod_str(p.dex_modifier)})"
                 )
                 ctk.CTkLabel(
                     inf, text=detail,
-                    font=ctk.CTkFont(size=11), text_color=GOLD_LIGHT, anchor="w",
+                    font=ctk.CTkFont(size=11), text_color="#AAAAAA", anchor="w",
                 ).pack(anchor="w")
             else:
                 ctk.CTkLabel(
                     inf,
                     text=f"{p.char_type}  •  Aguardando rolagem...",
-                    font=ctk.CTkFont(size=10), text_color="gray", anchor="w",
+                    font=ctk.CTkFont(size=11), text_color="gray", anchor="w",
                 ).pack(anchor="w")
 
             # Clique na linha → exibe ficha no card lateral
