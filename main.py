@@ -132,7 +132,7 @@ class CharacterCard(ctk.CTkScrollableFrame):
             ctk.CTkLabel(
                 header,
                 text="  •  ".join(sub_parts),
-                font=ctk.CTkFont(size=10, slant="italic"),
+                font=ctk.CTkFont(size=10),
                 text_color=GOLD_LIGHT,
             ).pack(padx=12, pady=(0, 8))
 
@@ -492,22 +492,46 @@ class EditModal(ctk.CTkToplevel):
             fields["dex_modifier"] = attr_dict.get("dex_mod", 0)
 
         # Habilidades Especiais (JSON)
-        try:
-            raw = self.traits_tb.get("0.0", "end").strip()
-            fields["special_traits"] = json.loads(raw) if raw else []
-        except json.JSONDecodeError:
-            fields["special_traits"] = self.char_data.get("special_traits", [])
+        raw_traits = self.traits_tb.get("0.0", "end").strip()
+        if not raw_traits or raw_traits == "[]":
+            fields["special_traits"] = []
+        else:
+            try:
+                parsed = json.loads(raw_traits)
+                if not isinstance(parsed, list):
+                    raise ValueError("Deve ser uma lista")
+                fields["special_traits"] = parsed
+            except (json.JSONDecodeError, ValueError) as e:
+                messagebox.showerror(
+                    "JSON Inválido — Habilidades Especiais",
+                    f"Corrija o JSON antes de salvar:\n{e}",
+                    parent=self,
+                )
+                return
 
         # Ações (JSON)
-        try:
-            raw = self.actions_tb.get("0.0", "end").strip()
-            fields["actions"] = json.loads(raw) if raw else []
-        except json.JSONDecodeError:
-            fields["actions"] = self.char_data.get("actions", [])
+        raw_actions = self.actions_tb.get("0.0", "end").strip()
+        if not raw_actions or raw_actions == "[]":
+            fields["actions"] = []
+        else:
+            try:
+                parsed = json.loads(raw_actions)
+                if not isinstance(parsed, list):
+                    raise ValueError("Deve ser uma lista")
+                fields["actions"] = parsed
+            except (json.JSONDecodeError, ValueError) as e:
+                messagebox.showerror(
+                    "JSON Inválido — Ações",
+                    f"Corrija o JSON antes de salvar:\n{e}",
+                    parent=self,
+                )
+                return
 
         update_character(self.char_data["id"], fields)
+        # Devolve o char_data atualizado para o callback
+        updated = {**self.char_data, **fields}
         self._dirty = False
-        self.on_save_cb()
+        self.on_save_cb(updated)
         self.destroy()
 
 
@@ -524,6 +548,7 @@ class App(ctk.CTk):
         create_table()
         self.encounter     = Encounter()
         self._active_modal = None   # EditModal aberto atualmente
+        self._card_char_id = None   # ID do personagem atualmente no card
 
         self.tabview = ctk.CTkTabview(self)
         self.tabview.pack(padx=12, pady=12, fill="both", expand=True)
@@ -744,9 +769,12 @@ class App(ctk.CTk):
             return
         self._active_modal = EditModal(self, char_data, self._on_edit_saved)
 
-    def _on_edit_saved(self):
+    def _on_edit_saved(self, updated_data: dict):
         self.refresh_character_list()
         self.refresh_combate_selectors()
+        # Se o card estava mostrando este personagem, atualiza com os dados novos
+        if self._card_char_id == updated_data.get("id"):
+            self.char_card.load(updated_data)
 
     def refresh_character_list(self):
         for w in self.scrollable_list.winfo_children():
@@ -779,6 +807,7 @@ class App(ctk.CTk):
                 info_f, text=c.get("name", "?"),
                 font=ctk.CTkFont(size=13, weight="bold"), anchor="w",
             ).pack(anchor="w")
+
 
             attrs = c.get("attributes", {})
             dex_m = attrs.get("dex_mod", c.get("dex_modifier", 0))
@@ -918,11 +947,15 @@ class App(ctk.CTk):
     # ── Seletor callbacks ─────────────────────────────────────────────────────
     def _on_player_select(self, value: str):
         if value and value != "Nenhum" and value in self.players_map:
-            self.char_card.load(self.players_map[value])
+            char = self.players_map[value]
+            self._card_char_id = char.get("id")
+            self.char_card.load(char)
 
     def _on_monster_select(self, value: str):
         if value and value != "Nenhum" and value in self.monsters_map:
-            self.char_card.load(self.monsters_map[value])
+            char = self.monsters_map[value]
+            self._card_char_id = char.get("id")
+            self.char_card.load(char)
 
     def refresh_combate_selectors(self):
         players  = get_characters_by_type("Jogador")
@@ -1030,6 +1063,7 @@ class App(ctk.CTk):
             # Clique na linha → exibe ficha no card lateral
             def _make_handler(participant):
                 def handler(_event):
+                    self._card_char_id = participant.char_data.get("id")
                     self.char_card.load(participant.char_data)
                 return handler
 
